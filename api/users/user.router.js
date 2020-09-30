@@ -2,28 +2,30 @@ const express = require('express');
 
 const {
   getUsers,
-  getContactById,
-  deleteContact,
+  getUserById,
+  deleteUser,
   addNewUser,
-  updateContact,
+  updateUser,
   validateCreateUser,
-  validateChangeFieldContact,
+  validateChangeFieldUser,
   validateId,
   validateSignIn,
   signIn,
   authorize,
-  logout
+  logout,
+  getCurrentUser
 } = require('./user.controller.js');
 
 const userRouter = express.Router();
+userRouter.post('/auth/register', validateCreateUser, addNewUser);
 
 userRouter.get('/', getUsers);
-// userRouter.get('/:id',validateId, getContactById);
-// userRouter.delete('/:id',validateId, deleteContact);
-userRouter.post('/', validateCreateUser, addNewUser);
-userRouter.put('/sign-in', validateSignIn, signIn);
-userRouter.patch("/logout", authorize, logout);
+userRouter.delete('/:id',validateId, deleteUser);
+userRouter.get('/current',authorize,getCurrentUser);
+userRouter.get('/:id',validateId, getUserById);
+userRouter.post('/login', validateSignIn, signIn);
+userRouter.post("/auth/logout", authorize, logout);
+userRouter.put('/:id', validateChangeFieldUser, updateUser);
 
-// userRouter.put('/:id', validateChangeFieldContact, updateContact);
 
 module.exports = userRouter;

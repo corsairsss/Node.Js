@@ -13,27 +13,33 @@ const usersModel = require('./user.model.js');
 async function getUsers(req, res, next) {
   try {
     const users = await usersModel.find();
-    return res.status(200).json(users);
+    const filtredUsers=getSomeField(users);
+    return res.status(200).json(filtredUsers);
   } catch (err) {
     next(err);
   }
 }
 
-async function getContactById(req, res, next) {
+async function getUserById(req, res, next) {
   try {
-    const contactId = req.params.id;
-    const contact = await contactsModel.findOne({ _id: contactId });
-    !contact ? res.status(404).send() : res.status(200).json(contact);
+    const userId = req.params.id;
+    const user = await usersModel.findOne({ _id: userId });
+    !user ? res.status(404).send() : res.status(200).json(user);
   } catch (err) {
     next(err);
   }
 }
+async function getCurrentUser(req,res,next) {
 
-async function deleteContact(req, res, next) {
+  const filtredUsers=getSomeField([req.user]);
+    return res.status(200).json(filtredUsers[0]);
+}
+
+async function deleteUser(req, res, next) {
   try {
-    const contactId = req.params.id;
-    const contact = await contactsModel.findByIdAndDelete({ _id: contactId });
-    !contact ? res.status(404).send() : res.status(200).json();
+    const userId = req.params.id;
+    const user = await usersModel.findByIdAndDelete({ _id: userId });
+    !user ? res.status(404).send() : res.status(200).json();
   } catch (err) {
     next();
   }
@@ -87,10 +93,10 @@ async function checkUser(email, password) {
 async function signIn(req, res, next) {
   try {
     const { email, password } = req.body;
-
     const token = await checkUser(email, password);
-
-    return res.status(200).json({ token });
+    const userId = await jwt.verify(token, process.env.JWT_SECRET).id;
+    const user = await usersModel.findOne({ _id: userId });
+    return res.status(200).json({ token,"user":{email,subscription: user.subscription} });
   } catch (err) {
     next(err);
   }
@@ -98,19 +104,19 @@ async function signIn(req, res, next) {
 
 
 
-async function updateContact(req, res, next) {
+async function updateUser(req, res, next) {
   try {
-    const contactId = req.params.id;
+    const userId = req.params.id;
 
-    const contactToUpdate = await contactsModel.findUserByIdAndUpdate(
-      contactId,
+    const userToUpdate = await usersModel.findUserByIdAndUpdate(
+      userId,
       req.body,
     );
-    if (!contactToUpdate) {
+    if (!userToUpdate) {
       return res.status(404).send();
     }
 
-    return res.status(200).send(contactToUpdate);
+    return res.status(200).send(userToUpdate);
   } catch (err) {
     next(err);
   }
@@ -148,7 +154,7 @@ async function authorize(req, res, next) {
     next();
   } catch (err) {
     next(err);
-  }
+  } 
 }
 
 async function logout(req,res,next) {
@@ -193,11 +199,9 @@ function validateSignIn(req, res, next) {
   next();
 }
 
-function validateChangeFieldContact(req, res, next) {
+function validateChangeFieldUser(req, res, next) {
   const createUserRules = Joi.object({
-    name: Joi.string(),
     email: Joi.string(),
-    phone: Joi.string(),
     subscription: Joi.string(),
     password: Joi.string(),
     token: Joi.string(),
@@ -222,18 +226,31 @@ function validateId(req, res, next) {
   next();
 }
 
+function getSomeField(users) {
+
+  const filterUsers=users.map(user=>({
+    email:user.email,
+    subscription:user.subscription,
+    id:user._id
+  }))
+
+  return filterUsers
+
+  }
+  
+
+
 module.exports = {
   addNewUser,
   getUsers,
-  getContactById,
-  deleteContact,
-  updateContact,
+  getUserById,
+  deleteUser,
+  updateUser,
   validateCreateUser,
-  validateChangeFieldContact,
+  validateChangeFieldUser,
   validateId,
-  ///////
   signIn,
   validateSignIn,
   authorize,
-  logout
+  logout,getCurrentUser
 };
