@@ -1,6 +1,8 @@
 const express = require('express');
 
+
 const {
+  getNewAvatar,
   getUsers,
   getUserById,
   deleteUser,
@@ -25,6 +27,6 @@ userRouter.get('/current', authorize, getCurrentUser);
 userRouter.get('/:id', validateId, getUserById);
 userRouter.post('/login', validateSignIn, signIn);
 userRouter.post('/auth/logout', authorize, logout);
-userRouter.put('/:id', validateChangeFieldUser, updateUser);
+userRouter.patch('/avatars',authorize, validateChangeFieldUser, getNewAvatar().single('avatar'), updateUser);
 
 module.exports = userRouter;

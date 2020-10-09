@@ -2,14 +2,62 @@ const Joi = require('joi');
 const { ObjectId } = require('mongodb');
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const AvatarGenerator = require('avatar-generator');
+const path=require('path');
+const { promises: fsPromises } = require('fs');
+const fs = require('fs');
+const multer = require('multer');
+const url = require('url');
 
 const { UnauthorizedError } = require('../helpers/error.js');
 const usersModel = require('./user.model.js');
+
+
+function getNewAvatar() {
+  
+  const storage = multer.diskStorage({
+    destination: 'api/public/images',
+    filename: function (req, file, cb) {
+      console.log('file', file);
+      const ext = path.parse(file.originalname).ext;
+      cb(null, Date.now() + ext);
+    }
+  })
+  
+  const upload = multer({ storage });
+  return upload;
+}
+  
+async function createAvatar() {
+  const avatar = new AvatarGenerator({
+    parts: ['background', 'face', 'clothes', 'head', 'hair', 'eye', 'mouth'], //order in which sprites should be combined
+    partsLocation: path.join(__dirname,'../../node_modules/avatar-generator/img'), // path to sprites
+    imageExtension: '.png' // sprite file extension
+});
+const image = await avatar.generate('id','male');
+const fileName=`${Date.now()}.png`;
+await image.png().toFile(path.join(__dirname,`../tmp/${fileName}`));
+
+// fsPromises.copyFile(`./api/tmp/${fileName}`,`./api/public/images/${fileName}`,(err)=>{if (err) throw err;});
+fs.rename(`./api/tmp/${fileName}`,`./api/public/images/${fileName}`,(err)=>{if (err) throw err;});
+return fileName;
+}
+
+async function createURLAvatar(FName) {
+  if (!FName){
+    const fileName=await createAvatar();
+    return `http://localhost:3000/images/${fileName}`  
+  }
+  return `http://localhost:3000/images/${FName}` 
+} 
+
+
 
 async function getUsers(req, res, next) {
   try {
     const users = await usersModel.find();
     const filtredUsers = getSomeField(users);
+
     return res.status(200).json(filtredUsers);
   } catch (err) {
     next(err);
@@ -45,6 +93,8 @@ async function deleteUser(req, res, next) {
 }
 async function addNewUser(req, res, next) {
   try {
+    const avatarURL=await createURLAvatar();
+
     const { email, password } = req.body;
     const passwordHash = await bcryptjs.hash(password, 4);
 
@@ -55,11 +105,13 @@ async function addNewUser(req, res, next) {
     const user = await usersModel.create({
       email,
       password: passwordHash,
+      avatarURL,
     });
 
     return res.status(201).json({
       email: user.email,
       subscription: user.subscription,
+      avatarURL:user.avatarURL
     });
   } catch (err) {
     next(err);
@@ -99,10 +151,20 @@ async function signIn(req, res, next) {
   }
 }
 
-async function updateUser(req, res, next) {
+ async function updateUser(req, res, next) {
   try {
-    const userId = req.params.id;
 
+    const FName= req.file.filename;
+    if (FName){
+      const avatarURL=await createURLAvatar(FName);
+      req.body.avatarURL=avatarURL;
+    }
+    
+    const oldUrl=req.user.avatarURL; //витягуємо повний аватар - url з користувача
+    const parsedUrl=url.parse(oldUrl);//отримаємо розпарсений url
+    fsPromises.unlink(`api/public${parsedUrl.pathname}`);//видаляємо старий файл з аватаром
+    
+    const userId = req.user.id;
     const userToUpdate = await usersModel.findUserByIdAndUpdate(
       userId,
       req.body,
@@ -111,11 +173,16 @@ async function updateUser(req, res, next) {
       return res.status(404).send();
     }
 
-    return res.status(200).send(userToUpdate);
+    return res.status(200).send(getSomeField([userToUpdate]));
+
   } catch (err) {
     next(err);
   }
 }
+
+
+
+
 
 async function authorize(req, res, next) {
   try {
@@ -165,6 +232,7 @@ async function logout(req, res, next) {
 function validateCreateUser(req, res, next) {
   const createUserRules = Joi.object({
     email: Joi.string().required(),
+    avatarURL:Joi.string(),
     password: Joi.string().required(),
     subscription: Joi.string(),
     token: Joi.string(),
@@ -180,6 +248,7 @@ function validateSignIn(req, res, next) {
   const signInRules = Joi.object({
     email: Joi.string().required(),
     password: Joi.string().required(),
+    
   });
 
   const validationResult = signInRules.validate(req.body);
@@ -192,10 +261,12 @@ function validateSignIn(req, res, next) {
 
 function validateChangeFieldUser(req, res, next) {
   const createUserRules = Joi.object({
-    email: Joi.string(),
+    // email: Joi.string(),
     subscription: Joi.string(),
-    password: Joi.string(),
-    token: Joi.string(),
+    // password: Joi.string(),
+    // token: Joi.string(),
+    avatarURL:Joi.string(),
+
   });
   const result = createUserRules.validate(req.body);
   if (result.error)
@@ -219,6 +290,7 @@ function getSomeField(users) {
     email: user.email,
     subscription: user.subscription,
     id: user._id,
+    avatarURL:user.avatarURL
   }));
 
   return filterUsers;
@@ -238,4 +310,5 @@ module.exports = {
   authorize,
   logout,
   getCurrentUser,
+  getNewAvatar
 };

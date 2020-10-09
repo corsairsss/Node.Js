@@ -20,7 +20,7 @@ module.exports = class ContactServer {
     await this.initDatabase();
     return this.startListening();
   }
-
+  
   initServer() {
     this.server = express();
   }
@@ -28,7 +28,10 @@ module.exports = class ContactServer {
     this.server.use(express.json());
     this.server.use(express.urlencoded());
     this.server.use(cors({ origin: 'http://localhost:3000' }));
+    this.server.use('/images',express.static(__dirname+'/public/images'));
+
   }
+
   initRoutes() {
     this.server.use('/contacts', contactRouter);
     this.server.use('/users', userRouter);
