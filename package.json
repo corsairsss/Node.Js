@@ -15,6 +15,7 @@
   "author": "alex",
   "license": "ISC",
   "dependencies": {
+    "@sendgrid/mail": "^7.2.6",
     "avatar-generator": "^2.0.4",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -27,7 +28,7 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.2",
     "url": "^0.11.0",
-    "uuid": "^8.3.0",
+    "uuid": "^8.3.1",
     "yargs": "^15.4.1"
   },
   "devDependencies": {

@@ -8,14 +8,18 @@ const { promises: fsPromises } = require('fs');
 const fs = require('fs');
 const multer = require('multer');
 const url = require('url');
+const uuid=require('uuid');
+const sgMail = require('@sendgrid/mail')
 
 const { UnauthorizedError } = require('../helpers/error.js');
 const usersModel = require('./user.model.js');
 
+sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+
+
 
 function getNewAvatar() {
-  
-  const storage = multer.diskStorage({
+    const storage = multer.diskStorage({
     destination: 'api/public/images',
     filename: function (req, file, cb) {
       console.log('file', file);
@@ -108,6 +112,8 @@ async function addNewUser(req, res, next) {
       avatarURL,
     });
 
+    sendEmailWithVerification(user);
+
     return res.status(201).json({
       email: user.email,
       subscription: user.subscription,
@@ -143,6 +149,7 @@ async function signIn(req, res, next) {
     const token = await checkUser(email, password);
     const userId = await jwt.verify(token, process.env.JWT_SECRET).id;
     const user = await usersModel.findOne({ _id: userId });
+    if(user.verificationToken) return res.status(404).json({"mesage":"User not Found"});
     return res
       .status(200)
       .json({ token, user: { email, subscription: user.subscription } });
@@ -261,10 +268,7 @@ function validateSignIn(req, res, next) {
 
 function validateChangeFieldUser(req, res, next) {
   const createUserRules = Joi.object({
-    // email: Joi.string(),
     subscription: Joi.string(),
-    // password: Joi.string(),
-    // token: Joi.string(),
     avatarURL:Joi.string(),
 
   });
@@ -296,6 +300,41 @@ function getSomeField(users) {
   return filterUsers;
 }
 
+async function sendEmailWithVerification(user) {
+  const token = uuid.v4();
+
+
+  await usersModel.createVerificationToken(user.id,token);
+  const msg = {
+    to: user.email, // Change to your recipient
+    from: 'oom2212@gmail.com', // Change to your verified sender
+    subject: 'Verify User',
+    text: 'and easy to do anywhere, even with Node.js',
+    html: `<a href='http://localhost:3000/users/auth/verify/${token}'>Click for verification</a>`,
+  }
+  await sgMail.send(msg);
+
+}
+
+
+async function verEmail(req,res,next) {
+  try{
+
+    const {verificationToken}=req.params;
+    const user= await usersModel.findOne({verificationToken});
+    if(!user) return res.status(404).json({"message" :"User not found"});
+
+    await usersModel.createVerificationToken(user.id,null);
+
+    return res.status(200).send();
+
+  }
+  catch(err){
+    next(err);
+  }
+
+}
+
 module.exports = {
   addNewUser,
   getUsers,
@@ -310,5 +349,6 @@ module.exports = {
   authorize,
   logout,
   getCurrentUser,
-  getNewAvatar
+  getNewAvatar,
+  verEmail
 };

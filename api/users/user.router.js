@@ -16,6 +16,7 @@ const {
   authorize,
   logout,
   getCurrentUser,
+  verEmail
 } = require('./user.controller.js');
 
 const userRouter = express.Router();
@@ -28,5 +29,6 @@ userRouter.get('/:id', validateId, getUserById);
 userRouter.post('/login', validateSignIn, signIn);
 userRouter.post('/auth/logout', authorize, logout);
 userRouter.patch('/avatars',authorize, validateChangeFieldUser, getNewAvatar().single('avatar'), updateUser);
+userRouter.get('/auth/verify/:verificationToken',verEmail);
 
 module.exports = userRouter;
